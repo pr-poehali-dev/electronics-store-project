@@ -4,6 +4,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import Icon from '@/components/ui/icon';
 
 interface Product {
@@ -25,8 +31,15 @@ interface CartItem extends Product {
 const Index = () => {
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
+  const [isAdminMode, setIsAdminMode] = useState(false);
+  const [adminProducts, setAdminProducts] = useState<Product[]>([]);
+  const [isAdminLoginOpen, setIsAdminLoginOpen] = useState(false);
+  const [adminPassword, setAdminPassword] = useState('');
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [newProduct, setNewProduct] = useState<Partial<Product>>({});
 
-  const products: Product[] = [
+  const [products, setProducts] = useState<Product[]>([
     {
       id: 1,
       name: 'Quantum Smartphone X1',
@@ -65,7 +78,7 @@ const Index = () => {
       isSale: true,
       description: 'Умные часы с holographic дисплеем'
     }
-  ];
+  ]);
 
   const addToCart = (product: Product) => {
     setCartItems(prev => {
@@ -101,6 +114,73 @@ const Index = () => {
 
   const cartTotal = cartItems.reduce((total, item) => total + (item.price * item.quantity), 0);
 
+  // Admin functions
+  const handleAdminLogin = () => {
+    if (adminPassword === 'admin123') {
+      setIsAuthenticated(true);
+      setIsAdminMode(true);
+      setIsAdminLoginOpen(false);
+      setAdminPassword('');
+      setAdminProducts([...products]);
+    }
+  };
+
+  const handleAdminLogout = () => {
+    setIsAuthenticated(false);
+    setIsAdminMode(false);
+    setAdminPassword('');
+  };
+
+  const handleAddProduct = () => {
+    if (newProduct.name && newProduct.price && newProduct.category) {
+      const product: Product = {
+        id: Date.now(),
+        name: newProduct.name,
+        price: newProduct.price,
+        originalPrice: newProduct.originalPrice,
+        image: newProduct.image || '/img/40472602-c256-44fe-bedd-b4f74a43e7bf.jpg',
+        category: newProduct.category,
+        isNew: newProduct.isNew || false,
+        isSale: newProduct.isSale || false,
+        description: newProduct.description || ''
+      };
+      const updatedProducts = [...products, product];
+      setProducts(updatedProducts);
+      setAdminProducts(updatedProducts);
+      setNewProduct({});
+    }
+  };
+
+  const handleEditProduct = (product: Product) => {
+    setEditingProduct(product);
+    setNewProduct({ ...product });
+  };
+
+  const handleUpdateProduct = () => {
+    if (editingProduct && newProduct.name && newProduct.price && newProduct.category) {
+      const updatedProducts = products.map(p => 
+        p.id === editingProduct.id ? { ...editingProduct, ...newProduct } : p
+      );
+      setProducts(updatedProducts);
+      setAdminProducts(updatedProducts);
+      setEditingProduct(null);
+      setNewProduct({});
+    }
+  };
+
+  const handleDeleteProduct = (productId: number) => {
+    const updatedProducts = products.filter(p => p.id !== productId);
+    setProducts(updatedProducts);
+    setAdminProducts(updatedProducts);
+  };
+
+  const salesData = {
+    totalRevenue: cartItems.reduce((total, item) => total + (item.price * item.quantity), 0),
+    totalOrders: cartItems.length,
+    totalProducts: products.length,
+    popularCategory: 'Смартфоны'
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900">
       {/* Header */}
@@ -129,6 +209,38 @@ const Index = () => {
                 placeholder="Поиск товаров..." 
                 className="w-64 bg-slate-800/50 border-blue-800/30 text-white placeholder:text-gray-400"
               />
+              <Dialog open={isAdminLoginOpen} onOpenChange={setIsAdminLoginOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" size="sm" className="border-blue-800/30 bg-slate-800/50 hover:bg-blue-800/20">
+                    <Icon name="Settings" size={16} />
+                    Админ
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="bg-slate-900 border-blue-800/30">
+                  <DialogHeader>
+                    <DialogTitle className="text-white">Вход в админ-панель</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="password" className="text-white">Пароль</Label>
+                      <Input
+                        id="password"
+                        type="password"
+                        value={adminPassword}
+                        onChange={(e) => setAdminPassword(e.target.value)}
+                        className="bg-slate-800/50 border-blue-800/30 text-white"
+                        placeholder="Введите пароль"
+                      />
+                    </div>
+                    <Button 
+                      onClick={handleAdminLogin}
+                      className="w-full bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700"
+                    >
+                      Войти
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
               <Sheet open={isCartOpen} onOpenChange={setIsCartOpen}>
                 <SheetTrigger asChild>
                   <Button variant="outline" size="icon" className="relative border-blue-800/30 bg-slate-800/50 hover:bg-blue-800/20">
@@ -203,6 +315,240 @@ const Index = () => {
           </div>
         </div>
       </header>
+
+      {/* Admin Panel */}
+      {isAdminMode && isAuthenticated && (
+        <section className="py-8 px-4 bg-slate-800/20 border-b border-blue-800/30">
+          <div className="container mx-auto">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold text-white">Админ-панель</h2>
+              <Button 
+                onClick={handleAdminLogout}
+                variant="outline" 
+                className="border-red-600/50 text-red-400 hover:bg-red-600/20"
+              >
+                <Icon name="LogOut" size={16} className="mr-2" />
+                Выйти
+              </Button>
+            </div>
+            
+            <Tabs defaultValue="products" className="w-full">
+              <TabsList className="grid w-full grid-cols-3 bg-slate-800/50">
+                <TabsTrigger value="products" className="text-white">Товары</TabsTrigger>
+                <TabsTrigger value="orders" className="text-white">Заказы</TabsTrigger>
+                <TabsTrigger value="analytics" className="text-white">Аналитика</TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="products" className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <h3 className="text-xl font-semibold text-white">Управление товарами</h3>
+                  <Dialog>
+                    <DialogTrigger asChild>
+                      <Button className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700">
+                        <Icon name="Plus" size={16} className="mr-2" />
+                        Добавить товар
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="bg-slate-900 border-blue-800/30 max-w-md">
+                      <DialogHeader>
+                        <DialogTitle className="text-white">
+                          {editingProduct ? 'Редактировать товар' : 'Добавить новый товар'}
+                        </DialogTitle>
+                      </DialogHeader>
+                      <div className="space-y-4">
+                        <div>
+                          <Label htmlFor="name" className="text-white">Название</Label>
+                          <Input
+                            id="name"
+                            value={newProduct.name || ''}
+                            onChange={(e) => setNewProduct({...newProduct, name: e.target.value})}
+                            className="bg-slate-800/50 border-blue-800/30 text-white"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="price" className="text-white">Цена</Label>
+                          <Input
+                            id="price"
+                            type="number"
+                            value={newProduct.price || ''}
+                            onChange={(e) => setNewProduct({...newProduct, price: Number(e.target.value)})}
+                            className="bg-slate-800/50 border-blue-800/30 text-white"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="originalPrice" className="text-white">Старая цена</Label>
+                          <Input
+                            id="originalPrice"
+                            type="number"
+                            value={newProduct.originalPrice || ''}
+                            onChange={(e) => setNewProduct({...newProduct, originalPrice: Number(e.target.value)})}
+                            className="bg-slate-800/50 border-blue-800/30 text-white"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="category" className="text-white">Категория</Label>
+                          <Select value={newProduct.category || ''} onValueChange={(value) => setNewProduct({...newProduct, category: value})}>
+                            <SelectTrigger className="bg-slate-800/50 border-blue-800/30 text-white">
+                              <SelectValue placeholder="Выберите категорию" />
+                            </SelectTrigger>
+                            <SelectContent className="bg-slate-800 border-blue-800/30">
+                              <SelectItem value="Смартфоны">Смартфоны</SelectItem>
+                              <SelectItem value="Ноутбуки">Ноутбуки</SelectItem>
+                              <SelectItem value="Аудио">Аудио</SelectItem>
+                              <SelectItem value="Носимые">Носимые</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label htmlFor="description" className="text-white">Описание</Label>
+                          <Textarea
+                            id="description"
+                            value={newProduct.description || ''}
+                            onChange={(e) => setNewProduct({...newProduct, description: e.target.value})}
+                            className="bg-slate-800/50 border-blue-800/30 text-white"
+                          />
+                        </div>
+                        <div className="flex items-center space-x-4">
+                          <div className="flex items-center space-x-2">
+                            <Switch 
+                              id="isNew"
+                              checked={newProduct.isNew || false}
+                              onCheckedChange={(checked) => setNewProduct({...newProduct, isNew: checked})}
+                            />
+                            <Label htmlFor="isNew" className="text-white">Новинка</Label>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <Switch 
+                              id="isSale"
+                              checked={newProduct.isSale || false}
+                              onCheckedChange={(checked) => setNewProduct({...newProduct, isSale: checked})}
+                            />
+                            <Label htmlFor="isSale" className="text-white">Акция</Label>
+                          </div>
+                        </div>
+                        <Button 
+                          onClick={editingProduct ? handleUpdateProduct : handleAddProduct}
+                          className="w-full bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700"
+                        >
+                          {editingProduct ? 'Обновить' : 'Добавить'}
+                        </Button>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {products.map(product => (
+                    <Card key={product.id} className="bg-slate-800/50 border-blue-800/30">
+                      <CardHeader className="pb-2">
+                        <div className="flex justify-between items-start">
+                          <CardTitle className="text-white text-sm">{product.name}</CardTitle>
+                          <div className="flex gap-2">
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => handleEditProduct(product)}
+                              className="border-blue-800/30 hover:bg-blue-800/20"
+                            >
+                              <Icon name="Edit" size={12} />
+                            </Button>
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => handleDeleteProduct(product.id)}
+                              className="border-red-600/50 text-red-400 hover:bg-red-600/20"
+                            >
+                              <Icon name="Trash2" size={12} />
+                            </Button>
+                          </div>
+                        </div>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-2">
+                          <p className="text-blue-400 font-semibold">{product.price.toLocaleString()} ₽</p>
+                          <p className="text-gray-400 text-xs">{product.category}</p>
+                          <div className="flex gap-2">
+                            {product.isNew && (
+                              <Badge className="bg-emerald-600 text-white text-xs">NEW</Badge>
+                            )}
+                            {product.isSale && (
+                              <Badge className="bg-red-600 text-white text-xs">SALE</Badge>
+                            )}
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </TabsContent>
+              
+              <TabsContent value="orders" className="space-y-4">
+                <h3 className="text-xl font-semibold text-white">Заказы</h3>
+                <div className="space-y-4">
+                  {cartItems.length === 0 ? (
+                    <p className="text-gray-400">Пока нет заказов</p>
+                  ) : (
+                    cartItems.map(item => (
+                      <Card key={item.id} className="bg-slate-800/50 border-blue-800/30">
+                        <CardContent className="p-4">
+                          <div className="flex justify-between items-center">
+                            <div>
+                              <h4 className="text-white font-medium">{item.name}</h4>
+                              <p className="text-gray-400 text-sm">Количество: {item.quantity}</p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-blue-400 font-semibold">{(item.price * item.quantity).toLocaleString()} ₽</p>
+                              <Badge className="bg-yellow-600 text-white text-xs">В обработке</Badge>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))
+                  )}
+                </div>
+              </TabsContent>
+              
+              <TabsContent value="analytics" className="space-y-4">
+                <h3 className="text-xl font-semibold text-white">Аналитика</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <Card className="bg-slate-800/50 border-blue-800/30">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-white text-sm">Общий доход</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-2xl font-bold text-green-400">{salesData.totalRevenue.toLocaleString()} ₽</p>
+                    </CardContent>
+                  </Card>
+                  <Card className="bg-slate-800/50 border-blue-800/30">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-white text-sm">Всего заказов</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-2xl font-bold text-blue-400">{salesData.totalOrders}</p>
+                    </CardContent>
+                  </Card>
+                  <Card className="bg-slate-800/50 border-blue-800/30">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-white text-sm">Товаров в каталоге</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-2xl font-bold text-purple-400">{salesData.totalProducts}</p>
+                    </CardContent>
+                  </Card>
+                  <Card className="bg-slate-800/50 border-blue-800/30">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-white text-sm">Популярная категория</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-lg font-bold text-cyan-400">{salesData.popularCategory}</p>
+                    </CardContent>
+                  </Card>
+                </div>
+              </TabsContent>
+            </Tabs>
+          </div>
+        </section>
+      )}
 
       {/* Hero Section */}
       <section className="py-20 px-4">
